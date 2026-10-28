@@ -1,0 +1,847 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>朝廷特使 · 驿路迟报</title>
+<style>
+/* ============ 配色与全局 ============ */
+:root{
+  --ink:#2a241d;
+  --paper:#f4ede0;
+  --gold:#a67c33;
+  --red:#a13a2c;
+  --blue:#3b5a72;
+  --green:#4f6b45;
+}
+*{box-sizing:border-box}
+body{
+  margin:0;padding:18px;min-height:100vh;
+  color:var(--ink);
+  font-family:"Songti SC","STSong","SimSun","Noto Serif SC",serif;
+  background-color:#1b1712;
+  background-image:
+    radial-gradient(900px 400px at 20% 0%,rgba(120,96,60,.35),transparent 60%),
+    radial-gradient(900px 500px at 100% 100%,rgba(40,60,50,.3),transparent 60%);
+}
+.wrap{max-width:1180px;margin:0 auto}
+header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 2px 14px}
+h1{margin:0;font-size:22px;font-weight:700;letter-spacing:4px;color:#eadfc9}
+h1 small{font-size:12px;letter-spacing:2px;color:#a08f74;font-weight:400;margin-left:6px}
+.turn-badge{font-size:13px;color:#eadfc9;border:1px solid #6b5d48;border-radius:999px;padding:5px 14px;letter-spacing:1px;background:rgba(0,0,0,.25)}
+main{display:grid;grid-template-columns:minmax(0,1fr) 330px;gap:14px;align-items:start}
+.col-left,.col-right{display:flex;flex-direction:column;gap:14px;min-width:0}
+
+/* ============ 卡片 ============ */
+.card{background:var(--paper);border:1px solid #b6a17c;border-radius:7px;box-shadow:0 3px 0 rgba(0,0,0,.28);overflow:hidden}
+.card-head{
+  display:flex;align-items:center;justify-content:space-between;gap:8px;
+  padding:9px 12px;font-size:13.5px;font-weight:700;letter-spacing:2px;
+  background:linear-gradient(#f8f2e5,#eee4d2);
+  border-bottom:1px solid #d8c8aa;color:#4a3d2b;
+}
+.card-head .mini{font-size:11px;font-weight:400;letter-spacing:0;color:#8f7d60}
+.card-head .mission{font-size:11px;font-weight:400;letter-spacing:0;color:#8b6a3c}
+.card-body{padding:12px}
+.map-card .card-body{padding:0}
+
+/* ============ 地图 ============ */
+#map{
+  position:relative;height:420px;overflow:hidden;
+  background:
+    radial-gradient(circle at 18% 28%,rgba(166,124,51,.10),transparent 45%),
+    radial-gradient(circle at 82% 72%,rgba(60,90,70,.10),transparent 42%),
+    repeating-linear-gradient(0deg,rgba(0,0,0,.022) 0 1px,transparent 1px 26px),
+    #f2ead9;
+}
+#roads{position:absolute;inset:0;width:100%;height:100%}
+#roads line{stroke:#bca887;stroke-width:2;stroke-dasharray:5 5;vector-effect:non-scaling-stroke;opacity:.85}
+.geo{position:absolute;font-size:12px;color:rgba(120,105,80,.22);letter-spacing:8px;pointer-events:none;z-index:1;white-space:nowrap}
+
+.node{
+  position:absolute;transform:translate(-50%,-50%);z-index:2;
+  min-width:80px;padding:6px 9px;text-align:center;
+  background:#fbf6ea;border:2px solid #b9a583;border-radius:6px;
+  transition:opacity .15s,box-shadow .15s,transform .15s,background .15s;
+  user-select:none;
+}
+.node .n-name{font-weight:700;font-size:15px;letter-spacing:2px;line-height:1.2}
+.node .n-sub{font-size:11px;color:#6d6152;margin-top:2px;white-space:nowrap}
+.node .n-tag{font-size:10px;color:#9a8b73;margin-top:1px;white-space:nowrap}
+.node.capital{background:#f9f0d8;border-color:var(--gold)}
+.node.rebel{background:#faeeea;border-color:var(--red)}
+.node.rebel .n-name{color:var(--red)}
+.node.frontier{background:#edf2f5;border-color:var(--blue)}
+.node.supply{background:#eef3ea;border-color:var(--green)}
+.node.muted{opacity:.5}
+.node.targetable{
+  cursor:pointer;border-color:var(--gold);
+  transform:translate(-50%,-50%) scale(1.06);
+  animation:pulse 1.6s infinite;
+}
+.node.targetable:hover{background:#fffbe9}
+@keyframes pulse{
+  0%,100%{box-shadow:0 0 0 3px rgba(166,124,51,.18)}
+  50%{box-shadow:0 0 0 9px rgba(166,124,51,.42)}
+}
+.map-hint{position:absolute;left:12px;bottom:10px;z-index:3;font-size:11.5px;color:#8d7f68;letter-spacing:1px}
+.legend{position:absolute;right:12px;bottom:10px;z-index:3;font-size:11px;color:#8d7f68;display:flex;gap:10px;align-items:center}
+.legend i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:3px;vertical-align:middle}
+.legend .l-rebel{background:var(--red)}
+.legend .l-front{background:var(--blue)}
+.legend .l-supply{background:var(--green)}
+
+/* ============ 资源面板 ============ */
+.res{display:flex;justify-content:space-between;align-items:baseline;font-size:13px;color:#4f4334;margin-bottom:4px}
+.res b{font-size:16px;font-family:"Courier New",monospace;color:#2a241d}
+.meter{height:6px;background:#e0d4bd;border-radius:3px;overflow:hidden;margin-bottom:11px}
+.meter i{display:block;height:100%;border-radius:3px;transition:width .25s}
+.m-grain{background:linear-gradient(90deg,#c9a45c,#a67c33)}
+.m-troops{background:linear-gradient(90deg,#6c8b62,#4f6b45)}
+.m-trust{background:linear-gradient(90deg,#bd6a55,#a13a2c)}
+.goal{font-size:11.5px;color:#7c6a4f;line-height:1.6;border-top:1px dashed #d8c8aa;padding-top:9px;margin-top:2px}
+
+/* ============ 号令按钮 ============ */
+.cmds{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.cmd{
+  font-family:inherit;text-align:left;padding:8px 9px;cursor:pointer;
+  border:1px solid #bfae90;border-radius:5px;background:#fbf6ea;color:var(--ink);
+  transition:background .15s,border-color .15s,box-shadow .15s;
+}
+.cmd:hover:not(:disabled){background:#fff8e4;border-color:var(--gold)}
+.cmd.active{background:#f6e6bf;border-color:var(--gold);box-shadow:inset 0 0 0 1px var(--gold)}
+.cmd.unaffordable{opacity:.55}
+.cmd:disabled{opacity:.4;cursor:not-allowed}
+.cmd .c-name{font-weight:700;font-size:14px;letter-spacing:1px}
+.cmd .c-meta{font-size:10.5px;color:#7b6d57;margin-top:3px;line-height:1.4}
+.target-hint{margin-top:10px;font-size:11.5px;color:#7d6c53;min-height:16px;letter-spacing:.5px}
+.target-hint.warn{color:#a13a2c}
+
+/* ============ 在途列表 ============ */
+.t-item{margin-bottom:9px}
+.t-item:last-child{margin-bottom:0}
+.t-row{display:flex;justify-content:space-between;gap:8px;font-size:12.5px;margin-bottom:3px}
+.t-row b{font-weight:700}
+.t-row span{color:#8a7a60;white-space:nowrap}
+.t-bar{height:5px;background:#e2d6be;border-radius:3px;overflow:hidden}
+.t-bar i{display:block;height:100%;background:linear-gradient(90deg,#c9a45c,#8a6a2c);transition:width .3s}
+.empty{color:#a4967e;font-size:12px;text-align:center;padding:8px 0}
+
+/* ============ 日志 ============ */
+#log{max-height:250px;overflow:auto;font-size:12.5px;line-height:1.6}
+.log-line{padding:3px 0;border-bottom:1px dashed #e2d5bd}
+.log-line:last-child{border-bottom:0}
+.log-line .lt{color:#a2947c;font-size:10.5px;margin-right:6px;font-family:"Courier New",monospace}
+.log-line.sys{color:#7d7059}
+.log-line.ok{color:#3f6240}
+.log-line.warn{color:#8a6323}
+.log-line.bad{color:#9c342a}
+.log-line.send{color:#3a5570}
+.log-line.in{color:#6a4a6a}
+
+/* ============ 按钮 ============ */
+.end-body{display:flex;flex-direction:column;gap:8px}
+.btn-end{
+  width:100%;padding:11px;font-family:inherit;font-size:16px;letter-spacing:4px;
+  color:#f7edda;background:linear-gradient(#8d2f24,#71231a);
+  border:1px solid #5c1b13;border-radius:5px;cursor:pointer;
+}
+.btn-end:hover:not(:disabled){filter:brightness(1.1)}
+.btn-end:disabled{opacity:.45;cursor:not-allowed}
+.btn-restart{
+  font-family:inherit;font-size:12px;letter-spacing:1px;padding:6px;
+  background:none;border:1px solid #c3b291;border-radius:4px;color:#7c6a4f;cursor:pointer;
+}
+.btn-restart:hover{background:#f0e7d5}
+
+/* ============ 结算弹窗 ============ */
+.modal{position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(18,14,10,.72)}
+.modal.hidden{display:none}
+.modal-box{
+  width:100%;max-width:430px;padding:26px 24px;text-align:center;
+  background:var(--paper);border:2px solid #b6a17c;border-radius:8px;
+  box-shadow:0 14px 50px rgba(0,0,0,.55);
+}
+.modal-box h2{margin:0 0 10px;font-size:22px;letter-spacing:4px;color:#7c2a20}
+.modal-box h2.win{color:#3f6240}
+.modal-box p{margin:0 0 14px;font-size:13px;line-height:1.8;color:#5c4e3c}
+#modal-stats{font-size:12px;color:#8a7a60;margin-bottom:18px;letter-spacing:1px}
+.btn-modal{
+  font-family:inherit;font-size:15px;letter-spacing:3px;padding:9px 26px;
+  color:#f7edda;background:#6d4b2b;border:1px solid #4f3420;border-radius:5px;cursor:pointer;
+}
+.btn-modal:hover{filter:brightness(1.1)}
+
+/* ============ 窄屏 ============ */
+@media (max-width:900px){
+  main{grid-template-columns:1fr}
+  #map{height:340px}
+  h1{font-size:18px}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>朝廷特使<small>驿路迟报</small></h1>
+    <div class="turn-badge" id="turn-badge">第 1 / 20 回合</div>
+  </header>
+
+  <main>
+    <!-- 左侧：地图 + 驿报 -->
+    <div class="col-left">
+      <section class="card map-card">
+        <div class="card-head">
+          <span>疆域图</span>
+          <span class="mission">平定荆襄 · 守住幽燕</span>
+        </div>
+        <div class="card-body">
+          <div id="map">
+            <svg id="roads" viewBox="0 0 100 100" preserveAspectRatio="none"></svg>
+            <div class="geo" style="left:48%;top:16%">黄河</div>
+            <div class="geo" style="left:52%;top:88%">大江</div>
+            <div class="map-hint" id="map-hint">点击右侧号令，再点地图上的目标区域</div>
+            <div class="legend">
+              <span><i class="l-rebel"></i>叛军</span>
+              <span><i class="l-front"></i>边关</span>
+              <span><i class="l-supply"></i>粮仓</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-head">
+          <span>驿报 · 消息与情报</span>
+          <span class="mini">最新在上</span>
+        </div>
+        <div class="card-body"><div id="log"></div></div>
+      </section>
+    </div>
+
+    <!-- 右侧：资源 / 号令 / 在途 / 结束回合 -->
+    <aside class="col-right">
+      <section class="card">
+        <div class="card-head">
+          <span>朝廷府库</span>
+          <span class="mini" id="actions-left">余 2 令</span>
+        </div>
+        <div class="card-body">
+          <div class="res"><span>粮草</span><b id="v-grain">0</b></div>
+          <div class="meter"><i id="b-grain" class="m-grain" style="width:0%"></i></div>
+          <div class="res"><span>兵力</span><b id="v-troops">0</b></div>
+          <div class="meter"><i id="b-troops" class="m-troops" style="width:0%"></i></div>
+          <div class="res"><span>朝廷信任</span><b id="v-trust">0</b></div>
+          <div class="meter"><i id="b-trust" class="m-trust" style="width:0%"></i></div>
+          <div class="goal">目标：二十回合内平定荆襄，且幽燕守备不可失。<br>每回合可发两道号令。</div>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-head">
+          <span>号令</span>
+          <span class="mini" id="mode-hint">未选</span>
+        </div>
+        <div class="card-body">
+          <div class="cmds" id="cmds"></div>
+          <div class="target-hint" id="target-hint">先选号令，再点目标区域</div>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-head">
+          <span>在途</span>
+          <span class="mini" id="transit-count">0 项</span>
+        </div>
+        <div class="card-body"><div id="transit"></div></div>
+      </section>
+
+      <section class="card">
+        <div class="card-body end-body">
+          <button id="end-btn" class="btn-end">结束回合</button>
+          <button class="btn-restart js-restart">重新开始</button>
+        </div>
+      </section>
+    </aside>
+  </main>
+</div>
+
+<!-- 结算弹窗 -->
+<div id="modal" class="modal hidden">
+  <div class="modal-box">
+    <h2 id="modal-title"></h2>
+    <p id="modal-text"></p>
+    <div id="modal-stats"></div>
+    <button class="btn-modal js-restart">再启一局</button>
+  </div>
+</div>
+
+<script>
+/* =====================================================================
+   一、可调参数：想改难度，优先改这里
+   ===================================================================== */
+const CFG = {
+  maxTurns: 20,          // 总回合数
+  actionsPerTurn: 2,     // 每回合可发号令数
+  startGrain: 120,
+  startTroops: 90,
+  startTrust: 65,
+  grainIncome: 12,       // 每回合粮草进项
+  troopIncome: 6,        // 每回合募兵
+  trustIncome: 2,        // 每回合信任恢复
+  troopCap: 140,
+  rebelStart: 60,        // 荆襄叛军初始实力
+  rebelGrowth: 3,        // 每回合叛军基础增长（再加 0~3 随机）
+  frontierStart: 45,     // 幽燕初始守备
+  frontierDecay: 3,      // 每回合幽燕守备损耗
+  grainBarMax: 300,
+  trustBarMax: 100
+};
+
+/* =====================================================================
+   二、地图数据：x / y 为百分比坐标，改数字即可挪动城池
+   ===================================================================== */
+const REGION_LIST = [
+  { id:'jing',  name:'京师', x:67, y:58, type:'capital'  },
+  { id:'yan',   name:'幽燕', x:82, y:14, type:'frontier' },
+  { id:'xiang', name:'荆襄', x:40, y:36, type:'rebel'    },
+  { id:'jiang', name:'江淮', x:25, y:76, type:'supply'   },
+  { id:'shu',   name:'蜀中', x:10, y:26, type:'supply'   }
+];
+const ROADS = [
+  ['jing','yan'], ['jing','xiang'], ['jing','jiang'],
+  ['xiang','jiang'], ['xiang','shu'], ['jiang','shu']
+];
+
+/* =====================================================================
+   三、号令表：turns = 在途回合数，cost = 发令时立即扣除的资源
+   targets = 可发往的区域（其余区域不可点）
+   ===================================================================== */
+const COMMANDS = {
+  move: {
+    name:'调兵', turns:3,
+    cost:{ troops:25, grain:15 },
+    targets:['xiang','yan']
+  },
+  supply: {
+    name:'运粮', turns:3,
+    cost:{ grain:25 },
+    targets:['xiang','yan']
+  },
+  levy: {
+    name:'征粮', turns:2,
+    cost:{ trust:6 },
+    targets:['jiang','shu']
+  },
+  amnesty: {
+    name:'招安', turns:4,
+    cost:{ trust:15, grain:15 },
+    targets:['xiang']
+  },
+  scout: {
+    name:'侦查', turns:2,
+    cost:{},
+    targets:['xiang']
+  }
+};
+
+/* =====================================================================
+   四、随机事件（w 为权重；cond 可选，条件不满足不参与抽取）
+   ===================================================================== */
+const EVENTS = [
+  { w:3, cond:()=> state.transit.length > 0, run(){
+      const c = pick(state.transit);
+      c.left += 1;
+      addLog(`【急报】暴雨冲毁驿道，${COMMANDS[c.type].name} → ${state.regions[c.target].name} 延误一回合。`, 'warn');
+  }},
+  { w:2, run(){ changeTrust(-6); addLog('【朝议】御史弹劾特使调度无方，朝廷信任 -6。', 'bad'); }},
+  { w:2, run(){ state.regions.yan.def = Math.max(0, state.regions.yan.def - 8); addLog('【边警】北狄游骑袭扰幽燕，守备 -8。', 'bad'); }},
+  { w:2, run(){ state.grain += 20; addLog('【民情】江淮新粮提前入仓，粮草 +20。', 'ok'); }},
+  { w:2, run(){ state.troops = Math.min(CFG.troopCap, state.troops + 12); addLog('【兵备】募兵顺利，兵力 +12。', 'ok'); }},
+  { w:1, run(){ state.regions.xiang.rebel = Math.max(0, state.regions.xiang.rebel - 10); addLog('【密报】叛军头目内讧，声势稍挫。', 'ok'); }},
+  { w:2, run(){ changeTrust(-3); addLog('【流言】京中流言四起，朝廷信任 -3。', 'warn'); }},
+  { w:4, run(){ /* 平静无事 */ }}
+];
+
+/* =====================================================================
+   五、游戏状态与工具函数
+   ===================================================================== */
+let state = null;
+const els = {};          // 存各城池的 DOM 节点
+let hintTimer = null;
+
+const rand = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
+const pick = arr => arr[Math.floor(Math.random() * arr.length)];
+const $ = id => document.getElementById(id);
+
+function addLog(text, type = 'sys'){
+  state.log.unshift({ text, type, turn: state.turn });
+  if (state.log.length > 80) state.log.pop();
+}
+function changeTrust(n){
+  state.trust = Math.max(0, Math.min(CFG.trustBarMax, state.trust + n));
+}
+
+/* =====================================================================
+   六、初始化
+   ===================================================================== */
+function initGame(){
+  state = {
+    turn: 1,
+    maxTurns: CFG.maxTurns,
+    grain: CFG.startGrain,
+    troops: CFG.startTroops,
+    trust: CFG.startTrust,
+    actionsLeft: CFG.actionsPerTurn,
+    transit: [],        // 在途命令
+    log: [],
+    mode: null,         // 当前选中的号令 key
+    over: false,
+    result: null,
+    seq: 0,
+    regions: {}
+  };
+
+  REGION_LIST.forEach(r => {
+    const base = { id:r.id, name:r.name, type:r.type };
+    if (r.id === 'xiang') Object.assign(base, {
+      rebel: CFG.rebelStart,
+      known: 45,          // 开局只有“传闻”，并非实数
+      knownTurn: 0
+    });
+    if (r.id === 'yan') base.def = CFG.frontierStart;
+    state.regions[r.id] = base;
+  });
+
+  addLog('目标：二十回合内平定荆襄，且幽燕守备不失。', 'sys');
+  addLog('荆襄叛军盘踞，北疆幽燕亦需守备；驿路迟滞，号令与回报皆有在途之期。', 'sys');
+  addLog('你是朝廷派往荆襄道的特使。圣上只给二十回合。', 'sys');
+
+  render();
+}
+
+/* =====================================================================
+   七、发令
+   ===================================================================== */
+function tryDispatch(type, regionId){
+  const cm = COMMANDS[type];
+  const region = state.regions[regionId];
+  if (state.over) return;
+
+  if (!cm.targets.includes(regionId)){
+    setHint('此处不宜发此号令', 'warn');
+    return;
+  }
+  if (state.actionsLeft <= 0){
+    setHint('本回合号令已用尽，请结束回合', 'warn');
+    return;
+  }
+
+  // 资源检查：缺什么就提示什么
+  const lack = [];
+  if ((cm.cost.troops || 0) > state.troops) lack.push('兵力');
+  if ((cm.cost.grain  || 0) > state.grain)  lack.push('粮草');
+  if ((cm.cost.trust  || 0) > state.trust)  lack.push('朝廷信任');
+  if (lack.length){
+    setHint(lack.join('、') + '不足，无法发令', 'warn');
+    return;
+  }
+
+  // 立即扣除资源（兵马粮草已经上路）
+  state.troops -= cm.cost.troops || 0;
+  state.grain  -= cm.cost.grain  || 0;
+  state.trust  -= cm.cost.trust  || 0;
+  state.actionsLeft--;
+
+  state.transit.push({
+    id: ++state.seq,
+    type,
+    target: regionId,
+    left: cm.turns,          // 还需几个回合抵达
+    total: cm.turns,
+    sentTurn: state.turn,
+    snapshot: { rebel: state.regions.xiang.rebel }  // 发令时的情报快照
+  });
+
+  addLog(`【发令】${cm.name} → ${region.name}，预计 ${cm.turns} 回合后抵达。`, 'send');
+  state.mode = null;
+  render();
+  setHint('号令已发出，静候驿马');
+}
+
+/* =====================================================================
+   八、命令抵达：在这里写各类号令的效果
+   ===================================================================== */
+function resolveCommand(c){
+  const cm = COMMANDS[c.type];
+  const r = state.regions[c.target];
+  addLog(`【抵达】${cm.name} → ${r.name}`, 'in');
+
+  switch (c.type){
+    case 'move': {
+      if (c.target === 'xiang'){
+        const hit = 18 + rand(0, 8);
+        r.rebel = Math.max(0, r.rebel - hit);
+        // 两军接战，终于拿到真实数字
+        r.known = r.rebel;
+        r.knownTurn = state.turn;
+        addLog(`官军与叛军接战，叛军受挫（现势 ${r.rebel}）。`, 'ok');
+      } else {
+        r.def = Math.min(100, r.def + 22);
+        addLog(`援军入驻幽燕，守备增至 ${r.def}。`, 'ok');
+      }
+      changeTrust(2);
+      break;
+    }
+
+    case 'supply': {
+      if (c.target === 'xiang'){
+        r.rebel = Math.max(0, r.rebel - (8 + rand(0, 5)));
+        addLog('粮车入荆襄赈济灾民，叛军兵源渐失。', 'ok');
+        changeTrust(4);
+      } else {
+        r.def = Math.min(100, r.def + 18);
+        addLog(`军粮运抵幽燕，边军士气复振，守备增至 ${r.def}。`, 'ok');
+        changeTrust(2);
+      }
+      break;
+    }
+
+    case 'levy': {
+      const g = 30 + rand(0, 10);
+      state.grain += g;
+      addLog(`于${r.name}征得粮草 ${g}，地方士绅颇有怨言。`, 'ok');
+      break;
+    }
+
+    case 'amnesty': {
+      if (Math.random() < 0.25){
+        addLog('招安使者被叛军扣留，朝野非议，信任 -5。', 'bad');
+        changeTrust(-5);
+      } else {
+        r.rebel = Math.max(0, r.rebel - (26 + rand(0, 6)));
+        addLog('叛军一部接受招抚，荆襄声势大减。', 'ok');
+        changeTrust(3);
+      }
+      break;
+    }
+
+    case 'scout': {
+      // 情报是“发令那一刻”的，路上又过了一段时间，故必然滞后
+      r.known = c.snapshot.rebel;
+      r.knownTurn = c.sentTurn;
+      addLog(`斥候回禀：荆襄叛军约 ${c.snapshot.rebel}（发令于第 ${c.sentTurn} 回合，此报已迟）。`, 'in');
+      break;
+    }
+  }
+
+  if (state.regions.xiang.rebel <= 0 && !state.over){
+    endGame(true, '捷报入京：荆襄叛军溃散，乱事平定，圣上嘉奖特使。');
+  }
+}
+
+/* =====================================================================
+   九、结束回合：推进在途 → 结算资源 → 局势变化 → 随机事件
+   ===================================================================== */
+function endTurn(){
+  if (state.over) return;
+  state.mode = null;
+
+  // 1. 所有在途命令前进一回合
+  const arrived = [];
+  state.transit.forEach(c => { c.left -= 1; if (c.left <= 0) arrived.push(c); });
+  state.transit = state.transit.filter(c => c.left > 0);
+
+  addLog(`—— 第 ${state.turn} 回合，驿路推进 ——`, 'sys');
+  arrived.forEach(resolveCommand);
+  if (state.over){ render(); return; }
+
+  // 2. 常规收支
+  state.grain += CFG.grainIncome;
+  state.troops = Math.min(CFG.troopCap, state.troops + CFG.troopIncome);
+  changeTrust(CFG.trustIncome);
+  addLog(`【常报】漕粮 +${CFG.grainIncome}，募兵 +${CFG.troopIncome}，信任 +${CFG.trustIncome}。`, 'sys');
+
+  // 3. 局势自然变化
+  const x = state.regions.xiang;
+  if (x.rebel > 0){
+    x.rebel += CFG.rebelGrowth + rand(0, 3);
+    addLog('【军情】叛军裹挟流民，声势渐长。', 'warn');
+  }
+  state.regions.yan.def = Math.max(0, state.regions.yan.def - CFG.frontierDecay);
+  addLog(`【边报】幽燕军饷不继，守备 -${CFG.frontierDecay}。`, 'warn');
+
+  // 4. 随机事件
+  rollEvent();
+
+  // 5. 时间推进
+  state.turn++;
+  state.actionsLeft = CFG.actionsPerTurn;
+
+  // 6. 判定胜负
+  checkEnd();
+  render();
+}
+
+function rollEvent(){
+  const pool = EVENTS.filter(e => !e.cond || e.cond());
+  const total = pool.reduce((s, e) => s + e.w, 0);
+  let n = Math.random() * total;
+  for (const e of pool){
+    n -= e.w;
+    if (n <= 0){ e.run(); return; }
+  }
+}
+
+function checkEnd(){
+  if (state.over) return;
+  const x = state.regions.xiang;
+  const y = state.regions.yan;
+
+  if (x.rebel <= 0) return endGame(true, '荆襄叛军溃散，乱事平定。');
+  if (y.def <= 0) return endGame(false, '幽燕失守，北疆门户洞开。');
+  if (state.trust <= 0) return endGame(false, '朝廷信任耗尽，你被革职拿问。');
+  if (state.turn > state.maxTurns) return endGame(false, `限期已尽（${state.maxTurns} 回合），荆襄仍未平定。`);
+}
+
+function endGame(win, msg){
+  if (state.over) return;
+  state.over = true;
+  state.result = { win, msg };
+  addLog(win ? `【大捷】${msg}` : `【败局】${msg}`, win ? 'ok' : 'bad');
+  render();
+}
+
+/* =====================================================================
+   十、渲染
+   ===================================================================== */
+function render(){
+  renderMap();
+  renderResources();
+  renderCommands();
+  renderTransit();
+  renderLog();
+  renderModal();
+
+  $('turn-badge').textContent = `第 ${Math.min(state.turn, state.maxTurns)} / ${state.maxTurns} 回合`;
+  $('actions-left').textContent = `余 ${state.actionsLeft} 令`;
+  $('end-btn').disabled = state.over;
+  $('transit-count').textContent = `${state.transit.length} 项`;
+  $('mode-hint').textContent = state.mode ? COMMANDS[state.mode].name + ' 待发' : '未选';
+
+  const hintEl = $('target-hint');
+  if (state.mode){
+    hintEl.textContent = '点击地图上高亮的区域发令（ESC 取消）';
+  } else {
+    hintEl.textContent = '先选号令，再点目标区域';
+  }
+  hintEl.classList.remove('warn');
+}
+
+function renderMap(){
+  REGION_LIST.forEach(def => {
+    const data = state.regions[def.id];
+    const el = els[def.id];
+    const canTarget = !state.over && state.mode && COMMANDS[state.mode].targets.includes(def.id);
+
+    el.classList.toggle('targetable', !!canTarget);
+    el.classList.toggle('muted', !!state.mode && !canTarget && !state.over);
+
+    let sub = '', tag = '';
+    if (def.id === 'xiang'){
+      sub = `叛军 ≈ ${data.known}`;
+      tag = data.knownTurn > 0 ? `情报·第 ${data.knownTurn} 回合` : '仅得传闻';
+    } else if (def.id === 'yan'){
+      sub = `守备 ${data.def}`;
+      tag = data.def < 20 ? '危在旦夕' : (data.def < 35 ? '吃紧' : '尚稳');
+    } else if (def.id === 'jiang'){
+      sub = '漕运粮仓';
+      tag = `每回合 +${CFG.grainIncome} 粮`;
+    } else if (def.id === 'shu'){
+      sub = '天府粮仓';
+      tag = '可征粮';
+    } else {
+      sub = '朝廷中枢';
+      tag = '';
+    }
+    el.querySelector('.n-sub').textContent = sub;
+    el.querySelector('.n-tag').textContent = tag;
+  });
+
+  $('map-hint').textContent = state.mode
+    ? `选择目标：${COMMANDS[state.mode].targets.map(id => state.regions[id].name).join(' / ')}（ESC 取消）`
+    : '点击右侧号令，再点地图上的目标区域';
+}
+
+function renderResources(){
+  $('v-grain').textContent  = state.grain;
+  $('v-troops').textContent = state.troops;
+  $('v-trust').textContent  = state.trust;
+
+  $('b-grain').style.width  = Math.max(0, Math.min(100, state.grain  / CFG.grainBarMax * 100)) + '%';
+  $('b-troops').style.width = Math.max(0, Math.min(100, state.troops / CFG.troopCap * 100)) + '%';
+  $('b-trust').style.width  = Math.max(0, Math.min(100, state.trust  / CFG.trustBarMax * 100)) + '%';
+}
+
+function renderCommands(){
+  const box = $('cmds');
+  box.innerHTML = '';
+
+  Object.keys(COMMANDS).forEach(key => {
+    const cm = COMMANDS[key];
+    const affordable = (cm.cost.troops || 0) <= state.troops
+                    && (cm.cost.grain  || 0) <= state.grain
+                    && (cm.cost.trust  || 0) <= state.trust;
+
+    const btn = document.createElement('button');
+    btn.className = 'cmd';
+    btn.dataset.cmd = key;
+    btn.disabled = state.over || state.actionsLeft <= 0;
+    if (!affordable) btn.classList.add('unaffordable');
+    if (state.mode === key) btn.classList.add('active');
+    btn.title = '可发往：' + cm.targets.map(id => state.regions[id].name).join('、');
+
+    const parts = [];
+    if (cm.cost.troops) parts.push('兵' + cm.cost.troops);
+    if (cm.cost.grain)  parts.push('粮' + cm.cost.grain);
+    if (cm.cost.trust)  parts.push('信' + cm.cost.trust);
+    if (!parts.length)  parts.push('无偿');
+
+    btn.innerHTML = `<div class="c-name">${cm.name}</div>`
+                  + `<div class="c-meta">${parts.join(' · ')} · ${cm.turns}回合</div>`;
+    box.appendChild(btn);
+  });
+}
+
+function renderTransit(){
+  const box = $('transit');
+  if (!state.transit.length){
+    box.innerHTML = '<div class="empty">驿道上暂无文书</div>';
+    return;
+  }
+  box.innerHTML = state.transit.map(c => {
+    const cm = COMMANDS[c.type];
+    const name = state.regions[c.target].name;
+    const pct = Math.max(0, Math.min(100, (c.total - c.left) / c.total * 100));
+    const delayed = c.left > c.total ? ' <b style="color:#a13a2c">延误</b>' : '';
+    return `<div class="t-item">
+      <div class="t-row"><b>${cm.name} → ${name}</b><span>余 ${c.left} 回合${delayed}</span></div>
+      <div class="t-bar"><i style="width:${pct}%"></i></div>
+    </div>`;
+  }).join('');
+}
+
+function renderLog(){
+  $('log').innerHTML = state.log.map(l =>
+    `<div class="log-line ${l.type}"><span class="lt">第${l.turn}回合</span>${l.text}</div>`
+  ).join('');
+}
+
+function renderModal(){
+  const modal = $('modal');
+  if (!state.over || !state.result){
+    modal.classList.add('hidden');
+    return;
+  }
+  modal.classList.remove('hidden');
+  const title = $('modal-title');
+  title.textContent = state.result.win ? '荆襄平定' : '使命失败';
+  title.className = state.result.win ? 'win' : '';
+  $('modal-text').textContent = state.result.msg;
+  $('modal-stats').textContent =
+    `历时 ${Math.min(state.turn, state.maxTurns)} 回合 · 粮草 ${state.grain} · 兵力 ${state.troops} · 信任 ${state.trust}`;
+}
+
+/* =====================================================================
+   十一、地图构建与交互绑定
+   ===================================================================== */
+function buildMap(){
+  const map = $('map');
+  REGION_LIST.forEach(def => {
+    const node = document.createElement('div');
+    node.className = 'node ' + def.type;
+    node.style.left = def.x + '%';
+    node.style.top = def.y + '%';
+    node.dataset.region = def.id;
+    node.innerHTML = '<div class="n-name"></div><div class="n-sub"></div><div class="n-tag"></div>';
+    node.querySelector('.n-name').textContent = def.name;
+    map.appendChild(node);
+    els[def.id] = node;
+  });
+}
+
+function buildRoads(){
+  const svg = $('roads');
+  const byId = {};
+  REGION_LIST.forEach(r => byId[r.id] = r);
+  ROADS.forEach(([a, b]) => {
+    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    line.setAttribute('x1', byId[a].x);
+    line.setAttribute('y1', byId[a].y);
+    line.setAttribute('x2', byId[b].x);
+    line.setAttribute('y2', byId[b].y);
+    svg.appendChild(line);
+  });
+}
+
+function describeRegion(id){
+  const d = state.regions[id];
+  if (id === 'xiang') return `荆襄：叛军约 ${d.known}（情报得自第 ${d.knownTurn || 0} 回合）`;
+  if (id === 'yan')   return `幽燕：守备 ${d.def} / 100`;
+  if (id === 'jiang') return `江淮：漕运粮仓，每回合入粮 ${CFG.grainIncome}`;
+  if (id === 'shu')   return '蜀中：天府粮仓，可征粮草';
+  return '京师：朝廷中枢，号令由此发出';
+}
+
+function setHint(text, type){
+  const el = $('target-hint');
+  el.textContent = text;
+  el.classList.toggle('warn', type === 'warn');
+  clearTimeout(hintTimer);
+  hintTimer = setTimeout(render, 2200);
+}
+
+function bindEvents(){
+  // 点地图
+  $('map').addEventListener('click', e => {
+    const node = e.target.closest('.node');
+    if (!node || state.over) return;
+    const id = node.dataset.region;
+
+    if (!state.mode){
+      setHint(describeRegion(id));   // 未选号令时，点地块只是查看
+      return;
+    }
+    tryDispatch(state.mode, id);
+  });
+
+  // 点号令
+  $('cmds').addEventListener('click', e => {
+    const btn = e.target.closest('.cmd');
+    if (!btn || btn.disabled) return;
+    const key = btn.dataset.cmd;
+    state.mode = (state.mode === key) ? null : key;
+    render();
+  });
+
+  $('end-btn').addEventListener('click', endTurn);
+  document.querySelectorAll('.js-restart').forEach(b => b.addEventListener('click', initGame));
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && state.mode){
+      state.mode = null;
+      render();
+    }
+  });
+}
+
+/* =====================================================================
+   十二、启动
+   ===================================================================== */
+buildMap();
+buildRoads();
+bindEvents();
+initGame();
+</script>
+</body>
+</html>
